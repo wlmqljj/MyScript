@@ -1,6 +1,14 @@
 import subprocess
-from PyQt5.QtWidgets import QApplication, QWidget, QTableWidget, QTableWidgetItem, QPushButton, QVBoxLayout, QHeaderView
-from PyQt5.QtGui import QResizeEvent
+from PyQt5.QtWidgets import QApplication, QWidget, QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout, QPushButton
+from PyQt5.QtCore import Qt, QRunnable, QThreadPool
+
+class CommandRunner(QRunnable):
+    def __init__(self, command):
+        super().__init__()
+        self.command = command
+
+    def run(self):
+        subprocess.call(['powershell.exe', *self.command])
 
 class AdbDeviceTable(QWidget):
     def __init__(self):
@@ -9,7 +17,7 @@ class AdbDeviceTable(QWidget):
         self.devices = []
         self.table = QTableWidget()
         self.table.setColumnCount(3)
-        self.table.setHorizontalHeaderLabels(['Serial Number', 'Product', 'Transport ID'])
+        self.table.setHorizontalHeaderLabels(['Serial Number', 'Model', 'Transport ID'])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.table.cellClicked.connect(self.on_cell_click)
         self.refresh_button = QPushButton('Refresh')
@@ -30,7 +38,7 @@ class AdbDeviceTable(QWidget):
         self.devices = self._get_connected_devices()
         self.table.setRowCount(len(self.devices))
         for i, device in enumerate(self.devices):
-            items = [QTableWidgetItem(device['serial']), QTableWidgetItem(device['product']), QTableWidgetItem(device['transport_id'])]
+            items = [QTableWidgetItem(device['serial']), QTableWidgetItem(device['product'].strip()), QTableWidgetItem(device['transport_id'])]
             for j, item in enumerate(items):
                 item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                 self.table.setItem(i, j, item)
@@ -41,12 +49,18 @@ class AdbDeviceTable(QWidget):
     def execute_adb_shell(self):
         if hasattr(self, 'selected_device'):
             serial = self.selected_device['serial']
-            subprocess.call(['powershell.exe', f'adb -s {serial} shell sh /storage/emulated/0/Android/data/moe.shizuku.privileged.api/start.sh'])
+            command = ['./adb.exe', '-s', serial, 'shell', 'sh', '/storage/emulated/0/Android/data/moe.shizuku.privileged.api/start.sh']
+            self.execute_command(command)
 
     def execute_scrcpy(self):
         if hasattr(self, 'selected_device'):
             serial = self.selected_device['serial']
-            subprocess.call(['powershell.exe', f'./scrcpy -s {serial}'])
+            command = ['./scrcpy.exe', '-s', serial]
+            self.execute_command(command)
+
+    def execute_command(self, command):
+        runner = CommandRunner(command)
+        QThreadPool.globalInstance().start(runner)
 
     @staticmethod
     def _get_connected_devices():
@@ -58,16 +72,13 @@ class AdbDeviceTable(QWidget):
                 continue
             devices.append({
                 'serial': s[0],
-                'product': s[3],
+                'product': s[3].split(':')[1],
                 'transport_id': s[5].split(':')[1] if len(s) > 4 else '',
             })
         return devices
 
 if __name__ == '__main__':
-    import sys
-    from PyQt5.QtCore import Qt
-
-    app = QApplication(sys.argv)
-    table = AdbDeviceTable()
-    table.show()
-    sys.exit(app.exec_())
+    app = QApplication([])
+    window = AdbDeviceTable()
+    window.show()
+    app.exec_()
