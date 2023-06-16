@@ -1,6 +1,8 @@
+import sys
 import subprocess
-from PyQt5.QtWidgets import QApplication, QWidget, QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout, QPushButton
-from PyQt5.QtCore import Qt, QRunnable, QThreadPool
+from PyQt6.QtCore import Qt, QRunnable, QThreadPool
+from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtWidgets import QApplication, QWidget, QTableWidget, QTableWidgetItem, QHeaderView, QVBoxLayout, QPushButton
 
 class CommandRunner(QRunnable):
     def __init__(self, command):
@@ -17,8 +19,8 @@ class AdbDeviceTable(QWidget):
         self.devices = []
         self.table = QTableWidget()
         self.table.setColumnCount(3)
-        self.table.setHorizontalHeaderLabels(['Serial Number', 'Model', 'Transport ID'])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.table.setHorizontalHeaderLabels(['Serial Number', 'Product', 'TID'])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.table.cellClicked.connect(self.on_cell_click)
         self.refresh_button = QPushButton('Refresh')
         self.refresh_button.clicked.connect(self.refresh_devices)
@@ -40,7 +42,7 @@ class AdbDeviceTable(QWidget):
         for i, device in enumerate(self.devices):
             items = [QTableWidgetItem(device['serial']), QTableWidgetItem(device['product'].strip()), QTableWidgetItem(device['transport_id'])]
             for j, item in enumerate(items):
-                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self.table.setItem(i, j, item)
 
     def on_cell_click(self, row, column):
@@ -78,7 +80,7 @@ class AdbDeviceTable(QWidget):
         return devices
 
 if __name__ == '__main__':
-    app = QApplication([])
+    app = QApplication(sys.argv)
     window = AdbDeviceTable()
     window.show()
-    app.exec_()
+    sys.exit(app.exec()) 
